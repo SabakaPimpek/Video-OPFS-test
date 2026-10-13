@@ -1,3 +1,4 @@
+
 const playlist = [
   "video/CityHall_3840x2160_4k.mp4",
   "video/output_h264_4k.mp4",
@@ -11,44 +12,126 @@ let started = false;
 let active = document.getElementById("playerA");
 let idle = document.getElementById("playerB");
 
-function loadVideo(video, index) {
+// Zachowujemy adresy Blob URL, żeby nie tworzyć ich wielokrotnie.
+const objectURLs = new Map();
+
+// Zapobiega równoczesnemu ładowaniu tego samego filmu
+// do tego samego odtwarzacza.
+const loadingPromises = new WeakMap();
+
+function getPlaylistFile(index) {
+  const url = playlist[index];
+  const fileInfo = videoFiles.find(item => item.url === url);
+
+  if (!fileInfo) {
+    throw new Error("Brak pliku w videoFiles: " + url);
+  }
+
+  return fileInfo;
+}
+
+async function getOPFSVideoURL(index) {
+  if (objectURLs.has(index)) {
+    return objectURLs.get(index);
+  }
+
+  const fileInfo = getPlaylistFile(index);
+  const file = await getVideoFromOPFS(fileInfo);
+
+  const localURL = URL.createObjectURL(file);
+  objectURLs.set(index, localURL);
+
+  console.log(
+    "Źródło OPFS:",
+    file.name,
+    (file.size / 1024 / 1024).toFixed(2) + " MiB"
+  );
+
+  return localURL;
+}
+
+async function loadVideo(video, index) {
   if (
     Number(video.dataset.playlistIndex) === index &&
     video.readyState >= 3
   ) {
-    return Promise.resolve();
+    return;
   }
 
-  video.pause();
-  video.dataset.playlistIndex = String(index);
+  const existingPromise = loadingPromises.get(video);
 
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      video.removeEventListener("canplay", onReady);
-      video.removeEventListener("error", onError);
-    };
+  if (existingPromise) {
+    await existingPromise;
 
-    const onReady = () => {
-      cleanup();
-      resolve();
-    };
-
-    const onError = () => {
-      cleanup();
-      reject(new Error("Błąd filmu: " + playlist[index]));
-    };
-
-    video.addEventListener("canplay", onReady);
-    video.addEventListener("error", onError);
-
-    video.src = playlist[index];
-    video.load();
-
-    if (video.readyState >= 3) {
-      cleanup();
-      resolve();
+    if (
+      Number(video.dataset.playlistIndex) === index &&
+      video.readyState >= 3
+    ) {
+      return;
     }
-  });
+  }
+
+  const promise = (async () => {
+    video.pause();
+
+    const localURL = await getOPFSVideoURL(index);
+
+    // Jeśli ten film jest już ustawiony i gotowy, nie przeładowuj go.
+    if (
+      video.src === localURL &&
+      Number(video.dataset.playlistIndex) === index &&
+      video.readyState >= 3
+    ) {
+      return;
+    }
+
+    await new Promise((resolve, reject) => {
+      let settled = false;
+
+      const cleanup = () => {
+        video.removeEventListener("canplay", onReady);
+        video.removeEventListener("error", onError);
+      };
+
+      const finish = callback => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback();
+      };
+
+      const onReady = () => {
+        video.dataset.playlistIndex = String(index);
+        finish(resolve);
+      };
+
+      const onError = () => {
+        finish(() => reject(
+          new Error("Błąd ładowania filmu: " + playlist[index])
+        ));
+      };
+
+      video.addEventListener("canplay", onReady);
+      video.addEventListener("error", onError);
+
+      video.src = localURL;
+      video.load();
+
+      if (video.readyState >= 3) {
+        onReady();
+      }
+    });
+  })();
+
+  loadingPromises.set(video, promise);
+
+  try {
+    await promise;
+  } finally {
+    if (loadingPromises.get(video) === promise) {
+      loadingPromises.delete(video);
+    }
+  }
 }
 
 async function prepareNext() {
@@ -56,9 +139,9 @@ async function prepareNext() {
 
   try {
     await loadVideo(idle, nextIndex);
-    console.log("Gotowy:", playlist[nextIndex]);
+    console.log("Gotowy z OPFS:", playlist[nextIndex]);
   } catch (err) {
-    console.error(err);
+    console.error("Błąd przygotowania następnego filmu:", err);
   }
 }
 
@@ -69,6 +152,8 @@ function waitForFrame(video) {
     });
   }
 
+  // Starsze przeglądarki: canplay zapewnia gotowość,
+  // ale nie gwarantuje dokładnego momentu wyświetlenia klatki.
   return Promise.resolve();
 }
 
@@ -86,30 +171,20 @@ async function switchVideo(event) {
   oldPlayer.removeEventListener("ended", switchVideo);
 
   try {
+    // Film jest pobierany z OPFS lub odczytywany z pamięci URL.
     await loadVideo(nextPlayer, nextIndex);
 
-    await loadVideo(nextPlayer, nextIndex);
+    nextPlayer.currentTime = 0;
 
-nextPlayer.currentTime = 0;
+    // Rejestrujemy oczekiwanie przed rozpoczęciem odtwarzania.
+    const framePromise = waitForFrame(nextPlayer);
 
-// Zarejestruj oczekiwanie na klatkę przed rozpoczęciem odtwarzania.
-const firstFrame = typeof nextPlayer.requestVideoFrameCallback === "function"
-  ? new Promise(resolve => {
-      nextPlayer.requestVideoFrameCallback(() => resolve());
-    })
-  : Promise.resolve();
+    await nextPlayer.play();
+    await framePromise;
 
-await nextPlayer.play();
-await firstFrame;
-    // Poczekaj, aż przeglądarka zgłosi nową klatkę.
-    if (typeof nextPlayer.requestVideoFrameCallback === "function") {
-      await new Promise(resolve => {
-        nextPlayer.requestVideoFrameCallback(() => resolve());
-      });
+    if (active !== oldPlayer || idle !== nextPlayer) {
+      return;
     }
-
-    // Upewnij się, że role nie zmieniły się w międzyczasie.
-    if (active !== oldPlayer || idle !== nextPlayer) return;
 
     nextPlayer.classList.add("active");
     oldPlayer.classList.remove("active");
@@ -123,7 +198,7 @@ await firstFrame;
     active.addEventListener("ended", switchVideo);
 
     console.log(
-      "Odtwarzany:",
+      "Odtwarzany z OPFS:",
       playlist[currentIndex],
       "czas:",
       active.currentTime,
@@ -131,8 +206,8 @@ await firstFrame;
       active.duration
     );
 
-    // Następny plik ładujemy na nieaktywnym playerze.
-    prepareNext();
+    // Przygotuj kolejny film w nieaktywnym odtwarzaczu.
+    void prepareNext();
 
   } catch (err) {
     console.error("Błąd przełączania:", err);
@@ -161,9 +236,9 @@ async function initPlayer() {
 
     active.addEventListener("ended", switchVideo);
 
-    prepareNext();
+    void prepareNext();
 
-    console.log("Start:", playlist[currentIndex]);
+    console.log("Start z OPFS:", playlist[currentIndex]);
 
   } catch (err) {
     console.error("Błąd uruchomienia:", err);
