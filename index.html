@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+  <title>Digital Signage Test Suite</title>
+  <style>
+ 
+  </style>
+</head>
+<body>
+
+  <video id="playerA" class="video-frame active" autoplay muted playsinline></video>
+  <video id="playerB" class="video-frame" muted playsinline></video>
+
+  <!-- Stałe elementy nakładane na wideo -->
+  <div class="overlay">
+    <img src="logo.png" class="logo" alt="Logo TV">
+    <div id="clock" class="clock">00:00:00.000</div>
+  </div>
+  <script src="scripts/video.js"></script>
+  <script src="scripts/clock.js"></script>
+  <script src="scripts/index.js"></script>
+  <script src="scripts/video-storage.js"></script>
+</body>
+</html>
