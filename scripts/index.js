@@ -7,9 +7,16 @@ if ('serviceWorker' in navigator) {
  }
 
 
+function emitPersistStatus(granted, supported) {
+  window.dispatchEvent(new CustomEvent("signage-storage-persist", {
+    detail: { granted, supported }
+  }));
+}
+
 async function enablePersistentStorage() {
   if (!navigator.storage?.persist) {
     console.warn("Persistent Storage nie jest obsługiwany.");
+    emitPersistStatus(false, false);
     return false;
   }
 
@@ -18,6 +25,7 @@ async function enablePersistentStorage() {
 
     if (alreadyPersistent) {
       console.log("Dane witryny są już chronione przed automatyczną eksmisją.");
+      emitPersistStatus(true, true);
       return true;
     }
 
@@ -29,9 +37,11 @@ async function enablePersistentStorage() {
         : "Przeglądarka nie przyznała trwałego przechowywania danych."
     );
 
+    emitPersistStatus(granted, true);
     return granted;
   } catch (error) {
     console.error("Błąd Persistent Storage:", error);
+    emitPersistStatus(false, true);
     return false;
   }
 }

@@ -18,11 +18,36 @@
     <img src="logo.png" class="logo" alt="Logo TV">
     <div id="clock" class="clock">00:00:00.000</div>
   </div>
+
+  <aside id="debug-overlay" class="debug-overlay" aria-label="Diagnostyka">
+    <div class="debug-overlay__title">Diagnostyka</div>
+    <dl class="debug-overlay__grid">
+      <div>
+        <dt>Backend</dt>
+        <dd id="debug-backend">wykrywanie…</dd>
+      </div>
+      <div>
+        <dt>Persist</dt>
+        <dd id="debug-persist">…</dd>
+      </div>
+      <div>
+        <dt>Quota</dt>
+        <dd id="debug-quota">…</dd>
+      </div>
+      <div>
+        <dt>Postęp</dt>
+        <dd id="debug-progress">oczekiwanie</dd>
+      </div>
+    </dl>
+    <ul id="debug-errors" class="debug-overlay__errors"></ul>
+  </aside>
+
   <script src="scripts/opfs-store.js"></script>
   <script src="scripts/cache-store.js"></script>
   <script src="scripts/storage-backend.js"></script>
   <script src="scripts/video-storage.js"></script>
   <script src="scripts/playlist.js"></script>
+  <script src="scripts/debug-overlay.js"></script>
   <script src="scripts/index.js?"></script>
   <script src="scripts/clock.js?"></script>
   <script src="scripts/video.js"></script>

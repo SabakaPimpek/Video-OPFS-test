@@ -29,3 +29,64 @@
     opacity: 1;        
     z-index: 10;       /* Na wierzchu */
   }
+
+  .debug-overlay {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 30;
+    max-width: min(420px, calc(100% - 32px));
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #e8e8e8;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    pointer-events: none;
+  }
+
+  .debug-overlay__title {
+    margin-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #9fd4ff;
+    background: transparent;
+  }
+
+  .debug-overlay__grid {
+    display: grid;
+    gap: 6px;
+    background: transparent;
+  }
+
+  .debug-overlay__grid > div,
+  .debug-overlay dt,
+  .debug-overlay dd {
+    background: transparent;
+  }
+
+  .debug-overlay dt {
+    color: #8a8a8a;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  .debug-overlay dd {
+    color: #f4f4f4;
+    word-break: break-word;
+  }
+
+  .debug-overlay__errors {
+    margin-top: 8px;
+    list-style: none;
+    background: transparent;
+  }
+
+  .debug-overlay__errors:empty {
+    display: none;
+  }
+
+  .debug-overlay__errors li {
+    margin-top: 4px;
+    color: #ffb4b4;
+    background: transparent;
+  }
