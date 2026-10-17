@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-17T12:00:00Z",
+  "videos": [
+    {
+      "id": "cityhall",
+      "url": "video/CityHall_3840x2160_4k.mp4",
+      "name": "CityHall_3840x2160_4k.mp4"
+    },
+    {
+      "id": "output-h264",
+      "url": "video/output_h264_4k.mp4",
+      "name": "output_h264_4k.mp4"
+    },
+    { 
+      "id": "theater-square",
+      "url": "video/TheaterSquare_3840x2160_4k.mp4",
+      "name": "TheaterSquare_3840x2160_4k.mp4"
+    }
+  ]
+}

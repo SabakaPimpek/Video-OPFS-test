@@ -17,9 +17,18 @@ if (self.workbox) {
 
   // 1. Cache plików aplikacji (App Shell).
   workbox.precaching.precacheAndRoute([
-    { url: "index.html", revision: "1.0" },
+    { url: "index.html", revision: "1.2" },
     { url: "logo.png", revision: "1.0" }
   ]);
+
+  // Playlista — zawsze najpierw sieć, cache tylko jako zapas offline.
+  registerRoute(
+    ({ url }) => /playlist\.json$/i.test(url.pathname),
+    new NetworkFirst({
+      cacheName: "signage-playlist",
+      networkTimeoutSeconds: 3
+    })
+  );
 
   // 2. Strony HTML — najpierw sieć, potem cache.
   registerRoute(
@@ -55,7 +64,8 @@ if (self.workbox) {
       url.origin === self.location.origin &&
       request.mode !== "navigate" &&
       request.destination !== "video" &&
-      !VIDEO_EXTENSIONS.test(url.pathname),
+      !VIDEO_EXTENSIONS.test(url.pathname) &&
+      !/playlist\.json$/i.test(url.pathname),
     new StaleWhileRevalidate({
       cacheName: "signage-assets",
       plugins: [

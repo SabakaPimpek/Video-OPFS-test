@@ -1,48 +1,54 @@
-
-const videoFiles = [
-  {
-    url: "video/CityHall_3840x2160_4k.mp4",
-    name: "CityHall_3840x2160_4k.mp4"
-  },
-  {
-    url: "video/output_h264_4k.mp4",
-    name: "output_h264_4k.mp4"
-  },
-  {
-    url: "video/TheaterSquare_3840x2160_4k.mp4",
-    name: "TheaterSquare_3840x2160_4k.mp4"
-  }
-];
-
-async function getOPFSRoot() {
-  if (!navigator.storage?.getDirectory) {
-    throw new Error("Ta przeglądarka nie obsługuje OPFS.");
+function matchesExpectedSize(file, expectedSize) {
+  if (!file || file.size <= 0) {
+    return false;
   }
 
-  return navigator.storage.getDirectory();
+  if (expectedSize == null) {
+    return true;
+  }
+
+  return file.size === expectedSize;
 }
 
-async function getVideoFromOPFS(video) {
-  const root = await getOPFSRoot();
-
-  // Sprawdź, czy plik już istnieje.
-  let handle;
-
-  try {
-    handle = await root.getFileHandle(video.name);
-    const existingFile = await handle.getFile();
-
-    if (existingFile.size > 0) {
-      console.log("Film dostępny lokalnie:", video.name);
-      return existingFile;
-    }
-  } catch (error) {
-    if (error.name !== "NotFoundError") {
-      throw error;
-    }
+function quotaMessage(name, error) {
+  if (error?.name === "QuotaExceededError") {
+    return `Brak miejsca w magazynie przy zapisie ${name}.`;
   }
 
-  // Pobierz film i zapisz go w OPFS.
+  return error?.message || String(error);
+}
+
+async function getLocalVideoFile(video) {
+  const store = await getVideoStore();
+  const existingFile = await store.get(video.name);
+
+  if (matchesExpectedSize(existingFile, video.size)) {
+    return existingFile;
+  }
+
+  return null;
+}
+
+async function ensureVideo(video) {
+  const store = await getVideoStore();
+  const existingFile = await store.get(video.name);
+
+  if (matchesExpectedSize(existingFile, video.size)) {
+    console.log("Film dostępny lokalnie:", video.name, "(" + store.kind + ")");
+    return existingFile;
+  }
+
+  if (existingFile) {
+    console.log(
+      "Rozmiar nie zgadza się, pobieram ponownie:",
+      video.name,
+      existingFile.size,
+      "≠",
+      video.size
+    );
+    await store.delete(video.name);
+  }
+
   console.log("Pobieranie filmu:", video.name);
 
   const response = await fetch(video.url);
@@ -53,28 +59,28 @@ async function getVideoFromOPFS(video) {
     );
   }
 
-  handle = await root.getFileHandle(video.name, {
-    create: true
-  });
-
-  const writable = await handle.createWritable();
-
   try {
-    await response.body.pipeTo(writable);
+    const file = await store.put(video.name, response);
+
+    if (!matchesExpectedSize(file, video.size)) {
+      await store.delete(video.name);
+      throw new Error(
+        `Zapisany plik ${video.name} ma rozmiar ${file.size} B, oczekiwano ${video.size} B`
+      );
+    }
+
+    console.log("Zapisano w", store.kind + ":", video.name, file.size, "B");
+    return file;
   } catch (error) {
-    // Usuń niekompletny plik, aby nie uznać go za gotowy.
-    await root.removeEntry(video.name).catch(() => {});
-    throw error;
+    throw new Error(quotaMessage(video.name, error));
   }
+}
 
-  const file = await handle.getFile();
-
-  console.log("Zapisano w OPFS:", video.name, file.size, "B");
-
-  return file;
+async function getVideoFromOPFS(video) {
+  return ensureVideo(video);
 }
 
 async function getLocalVideoURL(video) {
-  const file = await getVideoFromOPFS(video);
+  const file = await ensureVideo(video);
   return URL.createObjectURL(file);
 }

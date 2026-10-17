@@ -37,3 +37,4 @@ async function enablePersistentStorage() {
 }
 
 enablePersistentStorage();
+startPlaylistSync();
